@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
@@ -19,11 +20,17 @@ namespace GUI
         // Указатель на окно редактирования
         private RichTextBox inputBox;
         // Лист всех ошибок из всех файлов
-        private List<string> report = new List<string>();
+        private List<ReportFile> report = new List<ReportFile>();
 
         public FormGUI()
         {
             InitializeComponent();
+            files.TabPages.Add(NewFile("Новый документ 1"));
+            // Для сканера
+            outputBox.Columns[0].HeaderText = "Условный код";
+            outputBox.Columns[1].HeaderText = "Тип лексемы";
+            outputBox.Columns[2].HeaderText = "Лексема";
+            outputBox.Columns[3].HeaderText = "Местоположение";
         }
 
         // Меню - Файл
@@ -47,10 +54,12 @@ namespace GUI
             inputBoxFile.VScroll += new EventHandler(inputBox_VScroll);
             inputBoxFile.TextChanged += new EventHandler(inputBox_TextChanged);
             inputBoxFile.KeyPress += new KeyPressEventHandler(inputBox_KeyPress);
-            inputBoxFile.KeyDown += new KeyEventHandler(inputBox_KeyDown);
+            //inputBoxFile.KeyDown += new KeyEventHandler(inputBox_KeyDown);
             inputBox = inputBoxFile;
             inputBox.Focus();
-            report.Add(" ");
+
+            ReportFile reportFile = new ReportFile();
+            report.Add(reportFile);
 
             RichTextBox LineNumberFile = new RichTextBox();
             file.Controls.Add(LineNumberFile);
@@ -67,6 +76,8 @@ namespace GUI
             LineNumberFile.ScrollBars = RichTextBoxScrollBars.None;
             LineNumberFile.MouseDown += new MouseEventHandler(LineNumber_MouseDown);
             LineNumberFile.HideSelection = true;
+
+            UpdateLineNumbers(inputBoxFile);
 
             foreach (ToolStripItem button in toolStrip1.Items)
             {
@@ -128,12 +139,13 @@ namespace GUI
         {
             // Настраиваем вывод ошибок для каждого файла
             outputBox.Rows.Clear();
-            foreach (string file in report[files.SelectedIndex].Split('#'))
+
+            ReportFile reportFile = report[files.SelectedIndex];
+            for (int i = 0; i < reportFile.message.Count; i++)
             {
-                if (file != " " && file != "")
+                if (reportFile.message[i] != " " && reportFile.message[i] != "")
                 {
-                    string[] data = file.Split('@');
-                    outputBox.Rows.Add(data[0], data[1], data[2], data[3]);
+                    outputBox.Rows.Add(reportFile.path[i], reportFile.line[i],reportFile.column[i], reportFile.message[i]);
                 }
             }
 
@@ -200,7 +212,31 @@ namespace GUI
 
         private void Run_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Команда «Пуск» предназначена для запуска анализатора текста. Она также будет реализована позже.");
+            try
+            {
+                outputBox.Rows.Clear();
+
+                Scanner scanner = new Scanner();
+                List<Token> tokens = scanner.analyze(inputBox.Text);
+
+                ReportFile tempReport = new ReportFile();
+
+                foreach (Token token in tokens)
+                {
+                    outputBox.Rows.Add(token.id, token.type, token.name, token.location);
+                    tempReport.addReport(token.id.ToString(), token.type, token.name, token.location);
+                }
+
+                int indexFile = files.SelectedIndex;
+                report.RemoveAt(indexFile);
+                report.Insert(indexFile, tempReport);
+                
+                this.Refresh();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         // Меню - Справка
@@ -254,230 +290,6 @@ namespace GUI
         }
 
         // Меню - Локализация
-
-
-
-
-        // Меню - Размер текста
-
-        private void fontSize_Up(object sender, EventArgs e)
-        {
-            float size = buttonCancel.Font.Size;
-            string font = buttonCancel.Font.Name;
-
-            Size begin_size = this.Size;
-
-            font_Change(this, size + 1, font);
-
-            this.Size = begin_size;
-
-            statusFont.Text = $"Шрифт: {font} {size + 1}pt";
-        }
-        private void fontSize_Down(object sender, EventArgs e)
-        {
-            float size = buttonCancel.Font.Size;
-            string font = buttonCancel.Font.Name;
-
-            font_Change(this, size - 1, font);
-
-            statusFont.Text = $"Шрифт: {font} {size - 1}pt";
-        }
-        private void font_Change(Control control, float size, string font)
-        {
-            control.Font = new Font(font, size);
-            foreach (Control sub in control.Controls)
-            {
-                font_Change(sub, size, font);
-            }
-        }
-
-        // Строка состояния приложения
-
-        private int totalSec = 0;
-        private string sec = "сек";
-        private string time = "Время работы приложения: ";
-        private void timerApp_Tick(object sender, EventArgs e)
-        {
-            totalSec++;
-
-            int hours = totalSec / 3600;
-            int minutes = (totalSec % 3600) / 60;
-            int seconds = totalSec % 60;
-
-            string timeStatus;
-
-            if (hours > 0) timeStatus = $"{hours}:{minutes}:{seconds}";
-            else if (minutes > 0) timeStatus = $"{minutes}:{seconds}";
-            else timeStatus = $"{seconds} " + sec;
-
-            statusTimeApp.Text = time + timeStatus;
-        }
-
-        // Нумерация строк для окна редактирования
-
-        private void UpdateLineNumbers(object sender)
-        {
-            RichTextBox inputBox = sender as RichTextBox;
-            TabPage file = inputBox.Parent as TabPage;
-            RichTextBox LineNumber = file.GetChildAtPoint(new Point(3, 3)) as RichTextBox;
-
-            Point pt = new Point(0, 0);
-            int First_Index = inputBox.GetCharIndexFromPosition(pt);
-            int First_Line = inputBox.GetLineFromCharIndex(First_Index);
-
-            pt.X = ClientRectangle.Width;
-            pt.Y = ClientRectangle.Height;
-
-            int Last_Index = inputBox.GetCharIndexFromPosition(pt);
-            int Last_Line = inputBox.GetLineFromCharIndex(Last_Index);
-
-            LineNumber.SelectionAlignment = HorizontalAlignment.Center;
-            LineNumber.Text = "";
-            for (int i = First_Line; i <= Last_Line; i++)
-            {
-                LineNumber.Text += i + 1 + "\n";
-            }
-        }
-        private void inputBox_TextChanged(object sender, EventArgs e)
-        {
-            UpdateLineNumbers(sender);
-        }
-        private void inputBox_VScroll(object sender, EventArgs e)
-        {
-            RichTextBox inputBox = sender as RichTextBox;
-            TabPage file = inputBox.Parent as TabPage;
-            RichTextBox LineNumber = file.GetChildAtPoint(new Point(3, 3)) as RichTextBox;
-            
-            LineNumber.Text = "";
-            UpdateLineNumbers(sender);
-            LineNumber.Invalidate();
-        }
-        private void inputBox_SelectionChanged(object sender, EventArgs e)
-        {
-            RichTextBox inputBox = sender as RichTextBox;
-            Point pt = inputBox.GetPositionFromCharIndex(inputBox.SelectionStart);
-            if (pt.X == 0)
-            {
-                UpdateLineNumbers(sender);
-                curr_row = inputBox.GetLineFromCharIndex(inputBox.SelectionStart);
-            }
-        }
-
-        private void LineNumber_MouseDown(object sender, MouseEventArgs e)
-        {
-            RichTextBox lineNumber = sender as RichTextBox;
-            TabPage file = lineNumber.Parent as TabPage;
-            RichTextBox inputBox = file.GetChildAtPoint(new Point(51, 3)) as RichTextBox;
-
-            // Получаем индекс строки в lineNumber
-            int charIndex = lineNumber.GetCharIndexFromPosition(e.Location);
-            int visualLineIndex = lineNumber.GetLineFromCharIndex(charIndex);
-
-            // Проверяем, есть ли текст в этой строке lineNumber
-            if (visualLineIndex < lineNumber.Lines.Length)
-            {
-                string lineText = lineNumber.Lines[visualLineIndex].Trim();
-
-                if (int.TryParse(lineText, out int lineNumberValue) && lineNumberValue > 0)
-                {
-                    int targetLine = lineNumberValue - 1;
-
-                    if (targetLine >= 0 && targetLine < inputBox.Lines.Length)
-                    {
-                        // Выделяем всю строку
-                        int startIndex = inputBox.GetFirstCharIndexFromLine(targetLine);
-                        int lineLength = inputBox.Lines[targetLine].Length;
-
-                        inputBox.Select(startIndex, lineLength);
-                        
-                        inputBox.Focus();
-                    }
-                }
-            }
-        }
-        // Поля класса FormGUI
-        private int curr_row = 0;
-        private string word = "";
-        private string[] keywords = {
-            "if", "else", "int", "float", "while", "for", "return", "void",
-            "char", "double", "string", "bool", "true", "false", "null",
-            "break", "continue", "switch", "case", "default", "do", "foreach",
-            "in", "using", "namespace", "class", "static", "public", "private",
-            "protected", "internal", "new", "this", "try", "catch",
-            "finally", "throw", "enum", "struct"};
-        // Метод подсветки ключевого слова
-        private void HighlightKeyword(object sender, int pos, int len)
-        {
-            RichTextBox text_box = sender as RichTextBox;
-
-            // Сохраняем текущие настройки выделения
-            int oldStart = text_box.SelectionStart;
-            int oldLength = text_box.SelectionLength;
-            Color oldColor = text_box.SelectionColor;
-
-            // Подсвечиваем ключевое слово
-            text_box.SelectionStart = pos;
-            text_box.SelectionLength = len;
-            text_box.SelectionColor = Color.Blue; // Синий цвет для ключевых слов
-             
-            // Возвращаем курсор на место с обычным цветом
-            text_box.SelectionStart = oldStart;
-            text_box.SelectionLength = oldLength;
-            text_box.SelectionColor = Color.Black;
-        }
-
-        // Подсветка ключевых слов
-        private void inputBox_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            RichTextBox text_box = sender as RichTextBox;
-
-            // Разделители слов
-            if (e.KeyChar == '\r' || e.KeyChar == ' ' || e.KeyChar == '\0' ||
-                e.KeyChar == '\n' || e.KeyChar == '\t' || e.KeyChar == (char)Keys.Back)
-            {
-                if (!string.IsNullOrEmpty(word))
-                {
-                    int curr_pos = 0;
-
-                    // Проверяем, является ли слово ключевым (простая проверка без IndexOf)
-                    if (keywords.Contains(word.ToLower()))
-                    {
-                        // Находим позицию слова в текущей строке
-                        if (curr_row < text_box.Lines.Length)
-                        {
-                            string lineText = text_box.Lines[curr_row];
-                            int lastIndex = lineText.LastIndexOf(word, StringComparison.OrdinalIgnoreCase);
-
-                            if (lastIndex >= 0)
-                            {
-                                curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + lastIndex;
-                                HighlightKeyword(text_box, curr_pos, word.Length);
-                            }
-                        }
-                    }
-                }
-
-                if (e.KeyChar != (char)Keys.Back)
-                {
-                    word = "";
-                }
-            }
-            else if (e.KeyChar != (char)Keys.Back)
-            {
-                word += e.KeyChar;
-            }
-        }
-        private void inputBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Back && word.Length > 0)
-            {
-                word = word.Substring(0, word.Length - 1);
-            }
-            else if (e.KeyCode == Keys.Delete)
-            {
-                word = "";
-            }
-        }
 
         private void RusLg_Click(object sender, EventArgs e)
         {
@@ -618,6 +430,250 @@ namespace GUI
             else timeStatus = $"{seconds} " + sec;
 
             statusTimeApp.Text = time + timeStatus;
+        }
+
+
+        // Меню - Размер текста
+
+        private void fontSize_Up(object sender, EventArgs e)
+        {
+            float size = buttonCancel.Font.Size;
+            string font = buttonCancel.Font.Name;
+
+            Size begin_size = this.Size;
+
+            font_Change(this, size + 1, font);
+
+            this.Size = begin_size;
+
+            statusFont.Text = $"Шрифт: {font} {size + 1}pt";
+        }
+        private void fontSize_Down(object sender, EventArgs e)
+        {
+            float size = buttonCancel.Font.Size;
+            string font = buttonCancel.Font.Name;
+
+            font_Change(this, size - 1, font);
+
+            statusFont.Text = $"Шрифт: {font} {size - 1}pt";
+        }
+        private void font_Change(Control control, float size, string font)
+        {
+            control.Font = new Font(font, size);
+            foreach (Control sub in control.Controls)
+            {
+                font_Change(sub, size, font);
+            }
+        }
+
+        // Строка состояния приложения
+
+        private int totalSec = 0;
+        private string sec = "сек";
+        private string time = "Время работы приложения: ";
+        private void timerApp_Tick(object sender, EventArgs e)
+        {
+            totalSec++;
+
+            int hours = totalSec / 3600;
+            int minutes = (totalSec % 3600) / 60;
+            int seconds = totalSec % 60;
+
+            string timeStatus;
+
+            if (hours > 0) timeStatus = $"{hours}:{minutes}:{seconds}";
+            else if (minutes > 0) timeStatus = $"{minutes}:{seconds}";
+            else timeStatus = $"{seconds} " + sec;
+
+            statusTimeApp.Text = time + timeStatus;
+        }
+
+        // Нумерация строк для окна редактирования
+
+        private void UpdateLineNumbers(object sender)
+        {
+            RichTextBox inputBox = sender as RichTextBox;
+            TabPage file = inputBox.Parent as TabPage;
+            RichTextBox LineNumber = file.GetChildAtPoint(new Point(3, 3)) as RichTextBox;
+
+            Point pt = new Point(0, 0);
+            int First_Index = inputBox.GetCharIndexFromPosition(pt);
+            int First_Line = inputBox.GetLineFromCharIndex(First_Index);
+
+            pt.X = ClientRectangle.Width;
+            pt.Y = ClientRectangle.Height;
+
+            int Last_Index = inputBox.GetCharIndexFromPosition(pt);
+            int Last_Line = inputBox.GetLineFromCharIndex(Last_Index);
+
+            LineNumber.SelectionAlignment = HorizontalAlignment.Center;
+            LineNumber.Text = "";
+            for (int i = First_Line; i <= Last_Line; i++)
+            {
+                LineNumber.Text += i + 1 + "\n";
+            }
+        }
+        private void inputBox_TextChanged(object sender, EventArgs e)
+        {
+            if(curr_row != inputBox.GetLineFromCharIndex(inputBox.GetFirstCharIndexOfCurrentLine()) || curr_row == 0)
+            {
+                UpdateLineNumbers(sender);
+                curr_row = inputBox.GetLineFromCharIndex(inputBox.GetFirstCharIndexOfCurrentLine());
+            }
+        }
+
+        private void inputBox_VScroll(object sender, EventArgs e)
+        {
+            RichTextBox inputBox = sender as RichTextBox;
+            TabPage file = inputBox.Parent as TabPage;
+            RichTextBox LineNumber = file.GetChildAtPoint(new Point(3, 3)) as RichTextBox;
+            
+            LineNumber.Text = "";
+            UpdateLineNumbers(sender);
+            LineNumber.Invalidate();
+        }
+        private void inputBox_SelectionChanged(object sender, EventArgs e)
+        {
+            RichTextBox inputBox = sender as RichTextBox;
+            Point pt = inputBox.GetPositionFromCharIndex(inputBox.SelectionStart);
+            if (pt.X == 0)
+            {
+                UpdateLineNumbers(sender);
+            }
+        }
+
+        private void LineNumber_MouseDown(object sender, MouseEventArgs e)
+        {
+            RichTextBox lineNumber = sender as RichTextBox;
+            TabPage file = lineNumber.Parent as TabPage;
+            RichTextBox inputBox = file.GetChildAtPoint(new Point(51, 3)) as RichTextBox;
+
+            int charIndex = lineNumber.GetCharIndexFromPosition(e.Location);
+            int visualLineIndex = lineNumber.GetLineFromCharIndex(charIndex);
+
+            // Проверяем, есть ли текст в этой строке lineNumber
+            if (visualLineIndex < lineNumber.Lines.Length)
+            {
+                string lineText = lineNumber.Lines[visualLineIndex].Trim();
+
+                if (int.TryParse(lineText, out int lineNumberValue) && lineNumberValue > 0)
+                {
+                    int targetLine = lineNumberValue - 1;
+
+                    if (targetLine >= 0 && targetLine < inputBox.Lines.Length)
+                    {
+                        int startIndex = inputBox.GetFirstCharIndexFromLine(targetLine);
+                        int lineLength = inputBox.Lines[targetLine].Length;
+
+                        inputBox.Select(startIndex, lineLength);
+                        
+                        inputBox.Focus();
+                    }
+                }
+            }
+        }
+        // Текущая строка
+        private int curr_row = 0;
+        // Текущее слово
+        private string word = "";
+        private void backfillkeywords(object sender, int pos, int len)
+        {
+            RichTextBox text_box = sender as RichTextBox;
+            text_box.SelectionStart = pos;
+            text_box.SelectionLength = len;
+            text_box.SelectionBackColor = Color.Yellow;
+            text_box.SelectionStart = pos + len;
+            text_box.SelectionLength = 0;
+            text_box.SelectionBackColor = Color.White;
+        }
+        // Подсветка ключевых слов
+        private void inputBox_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            RichTextBox text_box = sender as RichTextBox;
+            if (e.KeyChar == '\r' || e.KeyChar == ' ' || e.KeyChar == '\0' || e.KeyChar == (char)Keys.Back)
+            {
+                int curr_pos = 0;
+                if (e.KeyChar == '\r') curr_row--;
+                switch (word.ToLower())
+                {
+                    case "if":
+                        curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + text_box.Lines[curr_row].IndexOf(word);
+                        backfillkeywords(text_box, curr_pos, word.Length);
+                        e.Handled = true;
+                        break;
+                    case "else":
+                        curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + text_box.Lines[curr_row].IndexOf(word);
+                        backfillkeywords(text_box, curr_pos, word.Length);
+                        e.Handled = true;
+                        break;
+                    case "int":
+                        curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + text_box.Lines[curr_row].IndexOf(word);
+                        backfillkeywords(text_box, curr_pos, word.Length);
+                        e.Handled = true;
+                        break;
+                    case "float":
+                        curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + text_box.Lines[curr_row].IndexOf(word);
+                        backfillkeywords(text_box, curr_pos, word.Length);
+                        e.Handled = true;
+                        break;
+                    case "while":
+                        curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + text_box.Lines[curr_row].IndexOf(word);
+                        backfillkeywords(text_box, curr_pos, word.Length);
+                        e.Handled = true;
+                        break;
+                    case "for":
+                        curr_pos = text_box.GetFirstCharIndexFromLine(curr_row) + text_box.Lines[curr_row].IndexOf(word);
+                        backfillkeywords(text_box, curr_pos, word.Length);
+                        e.Handled = true;
+                        break;
+                }
+                word = "";
+            }
+            else word += e.KeyChar;
+        }
+
+        private void FormGUI_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            DialogResult result;
+            if (files.SelectedIndex > -1)
+            {
+                result = MessageBox.Show("У вас есть несохраненный файл, сохранить?", "сообщение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    сохранениеКакToolStripMenuItem.PerformClick();
+                }
+            }
+        }
+        public class ReportFile
+        {
+            public List<string> path = new List<string>();
+            public List<string> line = new List<string>();
+            public List<string> column = new List<string>();
+            public List<string> message = new List<string>();
+            public ReportFile(string path = "", string line = "0", string column = "0", string message = "")
+            {
+                addReport(path, line, column, message);
+            }
+            public void addReport(string path = "", string line = "0", string column = "0", string message = "")
+            {
+                this.path.Add(path);
+                this.line.Add(line);
+                this.column.Add(column);
+                this.message.Add(message);
+            }
+        }
+
+        private void outputBox_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            inputBox.Focus();
+            if(e.RowIndex == -1) return;
+            string position = outputBox.Rows[e.RowIndex].Cells[3].Value.ToString();
+            string location = position.Split(' ')[1];
+            string line = location.Split(',')[0];
+            int numberLine = Convert.ToInt32(line);
+            string inLine = position.Split(' ')[2];
+            int positioninstr = Convert.ToInt32(inLine.Split('-')[0]);
+            inputBox.Select(inputBox.GetFirstCharIndexFromLine(numberLine - 1) + positioninstr - 1, 1);
         }
     }
 }

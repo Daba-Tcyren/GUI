@@ -144,19 +144,22 @@
             this.outputBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.outputBox.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.outputBox.AutoSizeRowsMode = System.Windows.Forms.DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders;
             this.outputBox.ColumnHeadersHeight = 29;
             this.outputBox.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             this.column0,
             this.Column1,
             this.Column2,
             this.Column3});
-            this.outputBox.Location = new System.Drawing.Point(12, 440);
+            this.outputBox.Location = new System.Drawing.Point(12, 379);
             this.outputBox.Name = "outputBox";
+            this.outputBox.ReadOnly = true;
             this.outputBox.RowHeadersVisible = false;
             this.outputBox.RowHeadersWidth = 51;
             this.outputBox.RowTemplate.Height = 24;
-            this.outputBox.Size = new System.Drawing.Size(951, 214);
+            this.outputBox.Size = new System.Drawing.Size(951, 275);
             this.outputBox.TabIndex = 1;
+            this.outputBox.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.outputBox_CellClick);
             // 
             // column0
             // 
@@ -641,14 +644,14 @@
             // русскийToolStripMenuItem
             // 
             this.русскийToolStripMenuItem.Name = "русскийToolStripMenuItem";
-            this.русскийToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.русскийToolStripMenuItem.Size = new System.Drawing.Size(132, 22);
             this.русскийToolStripMenuItem.Text = "Русский";
             this.русскийToolStripMenuItem.Click += new System.EventHandler(this.RusLg_Click);
             // 
             // китайскийToolStripMenuItem
             // 
             this.китайскийToolStripMenuItem.Name = "китайскийToolStripMenuItem";
-            this.китайскийToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.китайскийToolStripMenuItem.Size = new System.Drawing.Size(132, 22);
             this.китайскийToolStripMenuItem.Text = "Китайский";
             this.китайскийToolStripMenuItem.Click += new System.EventHandler(this.ChinaLg);
             // 
@@ -690,7 +693,7 @@
             this.files.Location = new System.Drawing.Point(12, 73);
             this.files.Name = "files";
             this.files.SelectedIndex = 0;
-            this.files.Size = new System.Drawing.Size(951, 338);
+            this.files.Size = new System.Drawing.Size(951, 287);
             this.files.TabIndex = 4;
             this.files.SelectedIndexChanged += new System.EventHandler(this.files_SelectedIndexChanged);
             this.files.DragDrop += new System.Windows.Forms.DragEventHandler(this.FormGUI_DragDrop);
@@ -698,6 +701,7 @@
             // 
             // statusLine
             // 
+            this.statusLine.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.statusLine.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.statusFont,
             this.statusTimeApp});
@@ -751,6 +755,7 @@
             this.Name = "FormGUI";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Compiler";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormGUI_FormClosing);
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.FormGUI_DragDrop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.FormGUI_DragEnter);
             ((System.ComponentModel.ISupportInitialize)(this.outputBox)).EndInit();
