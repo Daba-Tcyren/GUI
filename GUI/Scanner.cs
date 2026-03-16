@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,19 +20,14 @@ namespace GUI
             this.location = location;
         }
     }
-
     public class Scanner
     {
-        private enum States { START, ID, OUT, ASGN, ERROR };
-        private States cur_state = States.START;
         private string text;
         private char liter;
         private int currentPosition = 0;
         private int positionLine = 0;
         private int currentLine = 1;
-
         private string buffer = "";
-
         private List<Token> tokens = new List<Token>();
         public List<Token> analyze(string inputText)
         {
@@ -87,6 +82,7 @@ namespace GUI
                     buffer = "";
                 }
                 else
+                {
                     switch (liter)
                     {
                         case '\0':
@@ -103,7 +99,7 @@ namespace GUI
                             break;
                         case ' ':
                             addToken(5, "Разделитель", liter.ToString(), currentLine);
-                            getNext();
+                            while ((liter = getChar()) == ' ') { }
                             break;
                         case '(':
                             addToken(6, "Оператор конструктора", liter.ToString(), currentLine);
@@ -121,15 +117,16 @@ namespace GUI
                             addToken(11, "Оператор перечисления", liter.ToString(), currentLine);
                             getNext();
                             break;
-                        case ';': 
+                        case ';':
                             addToken(12, "Оператор заврешения", liter.ToString(), currentLine);
                             getNext();
                             break;
                         default:
-                            addToken(-1, "Недопустимый символ", liter.ToString(),  currentLine);
+                            addToken(-1, "Недопустимый символ", liter.ToString(), currentLine);
                             getNext();
                             break;
                     }
+                }
             }
 
             return tokens;
@@ -160,7 +157,7 @@ namespace GUI
         private string getLocation(string name, int curr_line)
         {
             int Length = name.Length;
-            if (Length == 1 && cur_state != States.ID) Length = 0;
+            if (Length == 1) Length = 0;
             int leng = positionLine - Length;
             if (Length > 0)
             {
